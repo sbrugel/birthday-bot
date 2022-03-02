@@ -4,6 +4,7 @@ import BirthdayModel from "../database/models/BirthdayModel";
 export const setbirthday: CommandInt = {
     name: 'setbirthday',
     description: 'Set your birthday',
+    slash: false,
     run: async (message) => {
         const{ author, channel, content } = message;
         const date = content.split(" ").slice(1).join(" "); // exclude the command name
