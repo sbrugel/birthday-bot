@@ -1,6 +1,5 @@
 import DiscordJS, { ApplicationCommand, ApplicationCommandPermissionData, ApplicationCommandPermissionType, Client, Collection, CommandInteraction, Guild, Intents, Interaction } from 'discord.js'
 import { connectDatabase } from "./database/connectDatabase"
-import { onMessage } from "./events/onMessage";
 import { CommandInt } from './interfaces/CommandInt';
 import { readdirRecursive } from './utils/readdirRecursive';
 
@@ -38,8 +37,6 @@ client.on('ready', async () => {
 
         const command: CommandInt = new commandModule.default;
 
-        if (!command.slash) continue; // don't register this as it is not slash
-
         command.name = name;
 
         const guildCmd = commands.cache.find(cmd => cmd.name === command.name);
@@ -48,7 +45,7 @@ client.on('ready', async () => {
             name: command.name,
             description: command.description,
             options: command?.options || [],
-            defaultPermission: false
+            defaultPermission: true // allow commands to be used by anyone
         }
 
         if (!guildCmd) {
@@ -58,33 +55,14 @@ client.on('ready', async () => {
         }
         
         client.commands.set(name, command);
+
+        console.log(cmdData.defaultPermission);
     }
-
-    await Promise.all(awaitedCommands);
-
-    // command permissions
-    console.log("Setting perms...");
-    await Promise.all(commands.cache.map(async command => {
-        let curPerms: ApplicationCommandPermissionData[];
-        try {
-			curPerms = await command.permissions.fetch({ command: command.id });
-		} catch (err) {
-			curPerms = [];
-		}
-
-		const botCmd = client.commands.find(cmd => cmd.name === command.name);
-
-		return commands.permissions.set({
-            command: command.id,
-            permissions: botCmd.permissions
-        });
-    }))
 
     // done with everything now!
     console.log('Ready!');
 })
 
-client.on("messageCreate", async (message) => await onMessage(message));
 client.on("interactionCreate", async (interaction) => {
     if (interaction.isCommand()) runCommand(interaction, client);
 })
