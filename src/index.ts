@@ -73,7 +73,7 @@ client.on('ready', async () => {
 		}
 
 		const botCmd = client.commands.find(cmd => cmd.name === command.name);
-        
+
 		return commands.permissions.set({
             command: command.id,
             permissions: botCmd.permissions
@@ -102,6 +102,6 @@ async function runCommand(interaction: CommandInteraction, client: Client): Prom
             console.log(error);
         }
     }
-    
-    return interaction.reply("Test");
+
+    return;
 }
