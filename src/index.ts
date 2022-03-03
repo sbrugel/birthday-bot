@@ -1,7 +1,10 @@
-import DiscordJS, { ApplicationCommand, ApplicationCommandPermissionData, ApplicationCommandPermissionType, Client, Collection, CommandInteraction, Guild, Intents, Interaction } from 'discord.js'
-import { connectDatabase } from "./database/connectDatabase"
-import { CommandInt } from './interfaces/CommandInt';
+import DiscordJS, { ApplicationCommand, ApplicationCommandPermissionData, ApplicationCommandPermissionType, Client, Collection, CommandInteraction, Guild, Intents, Interaction, MessageEmbed, TextChannel } from 'discord.js'
+import { MongoClient } from 'mongodb';
+import { Command } from './interfaces/CommandInt';
 import { readdirRecursive } from './utils/readdirRecursive';
+import cron from 'cron';
+import { DB, BOT, CHANNELS } from './config';
+
 
 const client = new DiscordJS.Client({
     intents: [
@@ -10,12 +13,14 @@ const client = new DiscordJS.Client({
     ]
 });
 
-client.login(process.env.TOKEN);
+client.login(BOT.TOKEN);
 
 client.on('ready', async () => {
     // connect to the DB
     console.log("Conencting to database...");
-    await connectDatabase();
+    await MongoClient.connect(DB.CONNECTION).then((bot) => {
+		client.mongo = bot.db(DB.COLLECTION);
+	});
 
     // load commands
     console.log("Loading commands...");
@@ -35,7 +40,7 @@ client.on('ready', async () => {
 			continue;
 		}
 
-        const command: CommandInt = new commandModule.default;
+        const command: Command = new commandModule.default;
 
         command.name = name;
 
@@ -55,13 +60,37 @@ client.on('ready', async () => {
         }
         
         client.commands.set(name, command);
-
-        console.log(cmdData.defaultPermission);
     }
 
     // done with everything now!
     console.log('Ready!');
+
+    birthdayCheck();
+
+    let job = new cron.CronJob('00 00 00 * * *', birthdayCheck);
+    job.start();
 })
+
+async function birthdayCheck() {
+    let toSend = client.channels.cache.get(CHANNELS.BIRTHDAY) as TextChannel;
+    await client.mongo.collection(DB.BIRTHDAYS).find().forEach( function(birthday) { 
+        const currentDate = new Date();
+        const date = new Date(birthday.birthday);
+        if (currentDate.getMonth() === date.getMonth() && currentDate.getDate() === date.getDate()) {
+            let embed: MessageEmbed;
+            if (date.getFullYear() !== 1900) {
+                embed = new MessageEmbed()
+                    .setTitle('Birthday Alert!')
+                    .setDescription(`Today is <@${ birthday.discordId }>'s birthday! They are now ${ currentDate.getFullYear() - date.getFullYear() } years old!`)
+            } else {
+                embed = new MessageEmbed()
+                    .setTitle('Birthday Alert!')
+                    .setDescription(`Today is <@${ birthday.discordId }>'s birthday!`)
+            }
+            toSend.send({ embeds: [embed] });
+        }
+    });
+}
 
 client.on("interactionCreate", async (interaction) => {
     if (interaction.isCommand()) runCommand(interaction, client);
